@@ -61,20 +61,47 @@ def _extract_names(text: str) -> list[str]:
     return candidates
 
 
-def _article_text(user_prompt: str) -> str:
-    """Return only the TITLE + CONTENT region of the prompt.
+def _split_prompt(user_prompt: str) -> tuple[str, str, str]:
+    """Split the rendered prompt into ``(title, author, content)``.
 
-    Critically, this strips the trailing JSON-shape instructions ("Full Name",
-    "short verb phrase", ...) so the mock never mistakes prompt scaffolding
-    for article content.
+    The extractor builds the prompt from a fixed template:
+
+        Article URL: ...
+        TITLE: <title>
+        AUTHOR: <author>
+
+        CONTENT:
+        <content>
+
+        Return JSON with exactly this shape:
+        { ... }
+
+    We pull out each region separately so (a) the JSON-shape example never
+    leaks into extraction, and (b) the header labels / author line cannot be
+    mistaken for article sentences (which previously produced polluted
+    evidence sentences and spurious author edges).
     """
 
     text = user_prompt
-    # Everything before the "Return JSON with exactly this shape:" marker.
     marker = "Return JSON with exactly this shape:"
     if marker in text:
         text = text.split(marker, 1)[0]
-    return text
+
+    title = ""
+    author = ""
+    title_match = re.search(r"^TITLE:\s*(.+)$", text, flags=re.MULTILINE)
+    if title_match:
+        title = title_match.group(1).strip()
+    author_match = re.search(r"^AUTHOR:\s*(.+)$", text, flags=re.MULTILINE)
+    if author_match:
+        author = author_match.group(1).strip()
+
+    content = ""
+    content_match = re.search(r"CONTENT:\s*(.*)$", text, flags=re.DOTALL)
+    if content_match:
+        content = content_match.group(1).strip()
+
+    return title, author, content
 
 
 def _find_relationships(sentences: Iterable[str]) -> list[dict]:
@@ -105,17 +132,16 @@ class MockLLMProvider(BaseLLMProvider):
     name = "mock"
 
     def complete_json(self, *, system_prompt: str, user_prompt: str) -> str:
-        # Only scan the TITLE + CONTENT region, never the JSON-shape example.
-        text = _article_text(user_prompt)
-        sentences = [s.strip() for s in _SENTENCE_SPLIT_RE.split(text) if s.strip()]
+        title, author, content = _split_prompt(user_prompt)
+
+        # Relationships and evidence sentences come from the article body and
+        # title only — never the header labels — so quotes stay clean.
+        body = f"{title}. {content}" if title else content
+        sentences = [s.strip() for s in _SENTENCE_SPLIT_RE.split(body) if s.strip()]
 
         people = list({name for s in sentences for name in _extract_names(s)})
-        # Make sure the author (if provided via the prompt) is included.
-        author_match = re.search(r"AUTHOR:\s*(.+)", text)
-        if author_match:
-            author_name = author_match.group(1).splitlines()[0].strip()
-            if author_name and is_probable_person_name(author_name) and author_name not in people:
-                people.append(author_name)
+        if author and is_probable_person_name(author) and author not in people:
+            people.append(author)
 
         relationships = _find_relationships(sentences)
         return json.dumps({"people": people, "relationships": relationships})

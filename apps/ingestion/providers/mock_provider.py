@@ -12,6 +12,7 @@ import json
 import re
 from typing import Iterable
 
+from apps.common.utils.text import is_probable_person_name
 from apps.ingestion.providers.base import BaseLLMProvider
 
 # A small set of relationship cues. The exact verb in the sentence becomes
@@ -49,16 +50,31 @@ def _extract_names(text: str) -> list[str]:
     seen: set[str] = set()
     for match in _NAME_RE.finditer(text):
         name = match.group(1).strip()
-        # Filter out obvious non-people: single capitalised words and common
-        # publication names. The resolver tolerates noise but we still try to
-        # keep it minimal here.
-        if len(name.split()) < 2:
+        # Use the shared validator so dates, org names and sentence-leading
+        # stopwords are rejected here, before they ever become a Person.
+        if not is_probable_person_name(name):
             continue
         if name in seen:
             continue
         seen.add(name)
         candidates.append(name)
     return candidates
+
+
+def _article_text(user_prompt: str) -> str:
+    """Return only the TITLE + CONTENT region of the prompt.
+
+    Critically, this strips the trailing JSON-shape instructions ("Full Name",
+    "short verb phrase", ...) so the mock never mistakes prompt scaffolding
+    for article content.
+    """
+
+    text = user_prompt
+    # Everything before the "Return JSON with exactly this shape:" marker.
+    marker = "Return JSON with exactly this shape:"
+    if marker in text:
+        text = text.split(marker, 1)[0]
+    return text
 
 
 def _find_relationships(sentences: Iterable[str]) -> list[dict]:
@@ -89,8 +105,8 @@ class MockLLMProvider(BaseLLMProvider):
     name = "mock"
 
     def complete_json(self, *, system_prompt: str, user_prompt: str) -> str:
-        # We expect ``user_prompt`` to contain "TITLE: ...\nAUTHOR: ...\nCONTENT: ...".
-        text = user_prompt
+        # Only scan the TITLE + CONTENT region, never the JSON-shape example.
+        text = _article_text(user_prompt)
         sentences = [s.strip() for s in _SENTENCE_SPLIT_RE.split(text) if s.strip()]
 
         people = list({name for s in sentences for name in _extract_names(s)})
@@ -98,7 +114,7 @@ class MockLLMProvider(BaseLLMProvider):
         author_match = re.search(r"AUTHOR:\s*(.+)", text)
         if author_match:
             author_name = author_match.group(1).splitlines()[0].strip()
-            if author_name and author_name not in people:
+            if author_name and is_probable_person_name(author_name) and author_name not in people:
                 people.append(author_name)
 
         relationships = _find_relationships(sentences)

@@ -11,6 +11,7 @@ import logging
 from typing import Optional
 
 from apps.common.exceptions import ExtractionError
+from apps.common.utils.text import is_probable_person_name
 from apps.ingestion.dto import (
     ExtractedRelationship,
     ExtractionResult,
@@ -65,7 +66,16 @@ class LLMRelationshipExtractor:
             except json.JSONDecodeError:
                 raise ExtractionError(f"LLM did not return valid JSON: {exc}") from exc
 
-        people = [str(p).strip() for p in payload.get("people", []) if str(p).strip()]
+        # Filter the people list down to probable personal names. This is the
+        # cheap safety net that keeps dates / org names / sentence fragments
+        # out of the graph regardless of which provider produced the output.
+        people = [
+            str(p).strip()
+            for p in payload.get("people", [])
+            if str(p).strip() and is_probable_person_name(str(p).strip())
+        ]
+        valid_people = set(people)
+
         rels_raw = payload.get("relationships") or []
         relationships: list[ExtractedRelationship] = []
         for item in rels_raw:
@@ -85,13 +95,16 @@ class LLMRelationshipExtractor:
                 continue
             if not rel.relationship_type:
                 continue
+            # Drop edges whose endpoints aren't probable people.
+            if not is_probable_person_name(rel.source) or not is_probable_person_name(rel.target):
+                continue
             relationships.append(rel)
 
-        # Ensure every relationship endpoint is in the people list (some
-        # providers omit names that only appear in edges).
+        # Ensure every (valid) relationship endpoint is in the people list.
         for rel in relationships:
             for name in (rel.source, rel.target):
-                if name not in people:
+                if name not in valid_people:
                     people.append(name)
+                    valid_people.add(name)
 
         return ExtractionResult(people=people, relationships=relationships)

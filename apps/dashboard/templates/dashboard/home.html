@@ -31,13 +31,13 @@
   <section class="panel">
     <h2>Rescan topic listing</h2>
     <p class="hint">Re-crawl TechCrunch OpenAI tag pages and merge into the graph (idempotent).</p>
-    <form method="post" action="{% url 'dashboard:home' %}">
+    <form method="post" action="{% url 'dashboard:home' %}" data-loading="Rescanning topic pages&hellip;">
       {% csrf_token %}
       <input type="hidden" name="action" value="rescan">
       <label for="pages">Number of listing pages</label>
       <input type="number" id="pages" name="pages" value="{{ default_pages }}" min="1" max="25" required>
       <button type="submit">Run rescan</button>
-      <p class="loading-note">May take 15–90+ seconds for many articles. Wait for the page to reload.</p>
+      <p class="loading-note">May take 15&ndash;90+ seconds for many articles. Wait for the page to reload.</p>
     </form>
 
     {% if rescan_report %}
@@ -61,7 +61,7 @@
   <section class="panel">
     <h2>Ingest one article</h2>
     <p class="hint">Paste a TechCrunch article URL (from <a href="https://techcrunch.com/tag/openai/" target="_blank" rel="noopener">tag/openai</a>).</p>
-    <form method="post" action="{% url 'dashboard:home' %}">
+    <form method="post" action="{% url 'dashboard:home' %}" data-loading="Fetching &amp; parsing article&hellip;">
       {% csrf_token %}
       <input type="hidden" name="action" value="ingest">
       <label for="url">Article URL</label>
@@ -85,7 +85,8 @@
 </div>
 
 <p>
-  <a href="{% url 'dashboard:people-list' %}" class="btn">Browse all people →</a>
+  <a href="{% url 'dashboard:people-list' %}" class="btn">Browse all people &rarr;</a>
+  <a href="{% url 'dashboard:articles-list' %}" class="btn secondary">Browse articles &rarr;</a>
 </p>
 
 {% endblock %}

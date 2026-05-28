@@ -4,49 +4,43 @@
 
 {% block content %}
 
-<p><a href="{% url 'dashboard:people-list' %}">← All people</a></p>
+<p><a href="{% url 'dashboard:people-list' %}">&larr; All people</a></p>
 
 <div class="panel" style="margin-bottom:1.5rem">
   <h2 style="margin-top:0">{{ person.canonical_name }}</h2>
   {% if person.aliases %}
-  <p><span class="hint">Also known as:</span> {{ person.aliases|join:", " }}</p>
+  <p><span class="hint">Also known as:</span>
+    {% for alias in person.aliases %}<span class="badge">{{ alias }}</span> {% endfor %}
+  </p>
   {% endif %}
-  <p class="hint">Mention count: {{ person.mention_count }} · ID {{ person.pk }}</p>
+  <p class="hint">
+    ID {{ person.pk }} &middot;
+    {{ relationships|length }} relationship{{ relationships|length|pluralize }} &middot;
+    {{ outgoing|length }} outgoing &middot; {{ incoming|length }} incoming &middot;
+    mentioned {{ person.mention_count }} time{{ person.mention_count|pluralize }}
+  </p>
 </div>
 
-<h3>Relationships ({{ relationships|length }})</h3>
-
 {% if relationships %}
-  {% for rel in relationships %}
-  <article class="relationship-card">
-    <div class="rel-header">
-      <span class="badge {% if rel.direction == 'outgoing' %}badge-out{% else %}badge-in{% endif %}">
-        {{ rel.direction_label }} {{ rel.relationship_type }}
-      </span>
-      <strong>
-        {% if rel.direction == 'outgoing' %}
-          {{ person.canonical_name }} → {{ rel.other_person.canonical_name }}
-        {% else %}
-          {{ rel.other_person.canonical_name }} → {{ person.canonical_name }}
-        {% endif %}
-      </strong>
-      <a href="{% url 'dashboard:person-detail' rel.other_person.pk %}">View person</a>
-    </div>
-    {% if rel.explanation %}
-    <p>{{ rel.explanation }}</p>
-    {% endif %}
-    {% if rel.evidence_sentence %}
-    <blockquote>{{ rel.evidence_sentence }}</blockquote>
-    {% endif %}
-    <p class="hint">
-      Source:
-      <a href="{{ rel.article.url }}" target="_blank" rel="noopener">{{ rel.article.title|truncatechars:80 }}</a>
-      {% if rel.confidence %} · confidence {{ rel.confidence }}{% endif %}
-    </p>
-  </article>
+
+  {% if outgoing %}
+  <h3 class="section-heading">Outgoing ({{ outgoing|length }})</h3>
+  {% for rel in outgoing %}
+    {% include "dashboard/_relationship_card.html" with rel=rel person=person %}
   {% endfor %}
+  {% endif %}
+
+  {% if incoming %}
+  <h3 class="section-heading">Incoming ({{ incoming|length }})</h3>
+  {% for rel in incoming %}
+    {% include "dashboard/_relationship_card.html" with rel=rel person=person %}
+  {% endfor %}
+  {% endif %}
+
 {% else %}
-<p class="hint">No relationships recorded for this person yet.</p>
+<div class="empty-state">
+  <p>No relationships recorded for this person yet.</p>
+</div>
 {% endif %}
 
 {% endblock %}

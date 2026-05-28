@@ -3,8 +3,8 @@
 {% block title %}Not found · News Knowledge Graph{% endblock %}
 
 {% block content %}
-<div class="alert alert-error">
-  Person #{{ pk }} does not exist.
+<div class="empty-state">
+  <p>Person #{{ pk }} does not exist.</p>
+  <a class="btn" href="{% url 'dashboard:people-list' %}">&larr; Back to all people</a>
 </div>
-<p><a href="{% url 'dashboard:people-list' %}">← All people</a></p>
 {% endblock %}

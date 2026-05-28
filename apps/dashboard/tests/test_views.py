@@ -24,6 +24,39 @@ def test_people_list_empty(client):
 
 
 @pytest.mark.django_db
+def test_people_search_filters(client):
+    Person.objects.create(canonical_name="Sam Altman", normalized_name="sam altman")
+    Person.objects.create(canonical_name="Elon Musk", normalized_name="elon musk")
+    response = client.get(reverse("dashboard:people-list"), {"q": "altman"})
+    assert response.status_code == 200
+    assert b"Sam Altman" in response.content
+    assert b"Elon Musk" not in response.content
+
+
+@pytest.mark.django_db
+def test_articles_list(client):
+    from apps.articles.models import Article
+
+    Article.objects.create(
+        url="https://techcrunch.com/2025/01/15/x/",
+        title="An OpenAI Story",
+        author_name="Jane Reporter",
+        source="techcrunch",
+    )
+    response = client.get(reverse("dashboard:articles-list"))
+    assert response.status_code == 200
+    assert b"An OpenAI Story" in response.content
+    assert b"Jane Reporter" in response.content
+
+
+@pytest.mark.django_db
+def test_articles_list_empty(client):
+    response = client.get(reverse("dashboard:articles-list"))
+    assert response.status_code == 200
+    assert b"No articles yet" in response.content
+
+
+@pytest.mark.django_db
 def test_person_detail(client):
     person = Person.objects.create(
         canonical_name="Sam Altman",

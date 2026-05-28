@@ -1,0 +1,75 @@
+{% extends "dashboard/base.html" %}
+
+{% block title %}Articles · News Knowledge Graph{% endblock %}
+
+{% block content %}
+
+<div class="stats-bar">
+  <div class="stat-card">
+    <div class="label">Articles</div>
+    <div class="value">{{ stats.article_count }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">People</div>
+    <div class="value">{{ stats.person_count }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Relationships</div>
+    <div class="value">{{ stats.relationship_count }}</div>
+  </div>
+</div>
+
+<div class="toolbar">
+  <h2 style="margin:0">Ingested articles</h2>
+  <form method="get" action="{% url 'dashboard:articles-list' %}" class="search-form">
+    <input type="search" name="q" value="{{ query }}" placeholder="Search title, author, URL…" aria-label="Search articles">
+    <input type="hidden" name="page_size" value="{{ page_size }}">
+    <button type="submit">Search</button>
+    {% if query %}<a class="btn secondary" href="{% url 'dashboard:articles-list' %}">Clear</a>{% endif %}
+  </form>
+</div>
+
+{% if query %}
+<p class="hint">Showing matches for &ldquo;{{ query }}&rdquo; — {{ paginator.count }} result{{ paginator.count|pluralize }}.</p>
+{% endif %}
+
+{% if page_obj.object_list %}
+<table class="data-table">
+  <thead>
+    <tr>
+      <th>Title</th>
+      <th>Author</th>
+      <th>Published</th>
+      <th>Source</th>
+      <th class="num">Edges</th>
+      <th>Link</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for article in page_obj %}
+    <tr>
+      <td>{{ article.title|truncatechars:80 }}</td>
+      <td class="hint">{% if article.author_name %}{{ article.author_name }}{% else %}&mdash;{% endif %}</td>
+      <td class="hint">{% if article.published_at %}{{ article.published_at|date:"Y-m-d" }}{% else %}&mdash;{% endif %}</td>
+      <td><span class="badge">{{ article.source }}</span></td>
+      <td class="num">{{ article.relationship_count }}</td>
+      <td><a href="{{ article.url }}" target="_blank" rel="noopener">Open &#8599;</a></td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+{% include "dashboard/_pagination.html" %}
+{% else %}
+<div class="empty-state">
+  {% if query %}
+  <p>No articles match &ldquo;{{ query }}&rdquo;.</p>
+  <a class="btn secondary" href="{% url 'dashboard:articles-list' %}">Clear search</a>
+  {% else %}
+  <p>No articles yet.</p>
+  <a class="btn" href="{% url 'dashboard:home' %}">Run a rescan on the dashboard</a>
+  {% endif %}
+</div>
+{% endif %}
+
+{% endblock %}

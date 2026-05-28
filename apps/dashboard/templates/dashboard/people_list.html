@@ -13,9 +13,25 @@
     <div class="label">Relationships</div>
     <div class="value">{{ stats.relationship_count }}</div>
   </div>
+  <div class="stat-card">
+    <div class="label">Articles</div>
+    <div class="value">{{ stats.article_count }}</div>
+  </div>
 </div>
 
-<h2 style="margin-top:0">Canonical people</h2>
+<div class="toolbar">
+  <h2 style="margin:0">Canonical people</h2>
+  <form method="get" action="{% url 'dashboard:people-list' %}" class="search-form">
+    <input type="search" name="q" value="{{ query }}" placeholder="Search name or alias…" aria-label="Search people">
+    <input type="hidden" name="page_size" value="{{ page_size }}">
+    <button type="submit">Search</button>
+    {% if query %}<a class="btn secondary" href="{% url 'dashboard:people-list' %}">Clear</a>{% endif %}
+  </form>
+</div>
+
+{% if query %}
+<p class="hint">Showing matches for &ldquo;{{ query }}&rdquo; — {{ paginator.count }} result{{ paginator.count|pluralize }}.</p>
+{% endif %}
 
 {% if page_obj.object_list %}
 <table class="data-table">
@@ -24,38 +40,36 @@
       <th>ID</th>
       <th>Name</th>
       <th>Aliases</th>
-      <th>Outgoing</th>
-      <th>Incoming</th>
-      <th>Mentions</th>
+      <th class="num">Outgoing</th>
+      <th class="num">Incoming</th>
+      <th class="num">Mentions</th>
     </tr>
   </thead>
   <tbody>
     {% for person in page_obj %}
     <tr>
-      <td><a href="{% url 'dashboard:person-detail' person.pk %}">{{ person.pk }}</a></td>
+      <td>{{ person.pk }}</td>
       <td><a href="{% url 'dashboard:person-detail' person.pk %}"><strong>{{ person.canonical_name }}</strong></a></td>
-      <td class="hint">{% if person.aliases %}{{ person.aliases|join:", "|truncatechars:60 }}{% else %}—{% endif %}</td>
-      <td>{{ person.outgoing_count }}</td>
-      <td>{{ person.incoming_count }}</td>
-      <td>{{ person.mention_count }}</td>
+      <td class="hint">{% if person.aliases %}{{ person.aliases|join:", "|truncatechars:60 }}{% else %}&mdash;{% endif %}</td>
+      <td class="num">{{ person.outgoing_count }}</td>
+      <td class="num">{{ person.incoming_count }}</td>
+      <td class="num">{{ person.mention_count }}</td>
     </tr>
     {% endfor %}
   </tbody>
 </table>
 
-<div class="pagination">
-  {% if page_obj.has_previous %}
-  <a class="btn secondary" href="?page={{ page_obj.previous_page_number }}">← Previous</a>
-  {% endif %}
-  <span class="muted">Page {{ page_obj.number }} of {{ paginator.num_pages }} ({{ paginator.count }} total)</span>
-  {% if page_obj.has_next %}
-  <a class="btn secondary" href="?page={{ page_obj.next_page_number }}">Next →</a>
+{% include "dashboard/_pagination.html" %}
+{% else %}
+<div class="empty-state">
+  {% if query %}
+  <p>No people match &ldquo;{{ query }}&rdquo;.</p>
+  <a class="btn secondary" href="{% url 'dashboard:people-list' %}">Clear search</a>
+  {% else %}
+  <p>No people yet.</p>
+  <a class="btn" href="{% url 'dashboard:home' %}">Run a rescan on the dashboard</a>
   {% endif %}
 </div>
-{% else %}
-<p class="hint">No people yet. <a href="{% url 'dashboard:home' %}">Run a rescan</a> on the dashboard.</p>
 {% endif %}
-
-<p style="margin-top:2rem"><a href="{% url 'dashboard:home' %}">← Dashboard</a></p>
 
 {% endblock %}

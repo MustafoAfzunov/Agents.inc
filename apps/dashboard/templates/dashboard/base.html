@@ -10,24 +10,55 @@
 <body>
   <div class="layout">
     <header class="site-header">
-      <h1>News → People Knowledge Graph</h1>
-      <p class="tagline">TechCrunch OpenAI topic · browse the graph or run ingestion below</p>
+      <div class="header-top">
+        <div>
+          <h1>News &rarr; People Knowledge Graph</h1>
+          <p class="tagline">TechCrunch OpenAI topic &middot; crawl, extract, resolve, and browse the graph</p>
+        </div>
+        <span class="provider-badge" title="Active LLM extraction provider">
+          LLM: <strong>{{ llm_provider|default:"mock" }}</strong>
+        </span>
+      </div>
       <nav class="main-nav">
         <a href="{% url 'dashboard:home' %}" {% if nav == 'home' %}class="active"{% endif %}>Dashboard</a>
         <a href="{% url 'dashboard:people-list' %}" {% if nav == 'people' %}class="active"{% endif %}>People</a>
-        <a href="/people/" target="_blank" rel="noopener">API (JSON)</a>
-        <a href="/admin/" target="_blank" rel="noopener">Admin</a>
+        <a href="{% url 'dashboard:articles-list' %}" {% if nav == 'articles' %}class="active"{% endif %}>Articles</a>
+        <a href="/people/" target="_blank" rel="noopener">API (JSON) &#8599;</a>
+        <a href="/admin/" target="_blank" rel="noopener">Admin &#8599;</a>
       </nav>
     </header>
 
     {% block content %}{% endblock %}
 
     <footer class="site-footer">
-      REST API: <a href="/articles/">POST /articles/</a> ·
-      <a href="/rescan/">POST /rescan/</a> ·
-      <a href="/people/">GET /people/</a> ·
+      REST API:
+      <a href="/articles/">POST /articles/</a> &middot;
+      <a href="/rescan/">POST /rescan/</a> &middot;
+      <a href="/people/">GET /people/</a> &middot;
       <a href="/health/">/health/</a>
     </footer>
   </div>
+
+  <!-- Loading overlay shown while a slow rescan/ingest request is in flight. -->
+  <div id="loading-overlay" class="loading-overlay" hidden>
+    <div class="loading-box">
+      <div class="spinner"></div>
+      <p id="loading-text">Working&hellip;</p>
+      <p class="loading-sub">Crawling + parsing can take 15&ndash;90+ seconds. Please wait.</p>
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", function () {
+      var overlay = document.getElementById("loading-overlay");
+      var text = document.getElementById("loading-text");
+      document.querySelectorAll("form[data-loading]").forEach(function (form) {
+        form.addEventListener("submit", function () {
+          if (text) { text.textContent = form.getAttribute("data-loading") || "Working\u2026"; }
+          if (overlay) { overlay.hidden = false; }
+        });
+      });
+    });
+  </script>
 </body>
 </html>

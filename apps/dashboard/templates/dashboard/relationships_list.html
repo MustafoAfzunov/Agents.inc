@@ -1,0 +1,71 @@
+{% extends "dashboard/base.html" %}
+
+{% block title %}Relationships · News Knowledge Graph{% endblock %}
+
+{% block content %}
+
+<div class="stats-bar">
+  <div class="stat-card">
+    <div class="label">Relationships</div>
+    <div class="value">{{ stats.relationship_count }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">People</div>
+    <div class="value">{{ stats.person_count }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Articles</div>
+    <div class="value">{{ stats.article_count }}</div>
+  </div>
+</div>
+
+<div class="toolbar">
+  <h2 style="margin:0">All relationships</h2>
+  <form method="get" action="{% url 'dashboard:relationships-list' %}" class="search-form">
+    <input type="search" name="q" value="{{ query }}" placeholder="Search type or person…" aria-label="Search relationships">
+    <input type="hidden" name="page_size" value="{{ page_size }}">
+    <button type="submit">Search</button>
+    {% if query %}<a class="btn secondary" href="{% url 'dashboard:relationships-list' %}">Clear</a>{% endif %}
+  </form>
+</div>
+
+{% if query %}
+<p class="hint">Showing matches for &ldquo;{{ query }}&rdquo; — {{ paginator.count }} result{{ paginator.count|pluralize }}.</p>
+{% endif %}
+
+{% if page_obj.object_list %}
+  {% for rel in page_obj %}
+  <article class="relationship-card">
+    <div class="rel-header">
+      <span class="badge badge-out">{{ rel.relationship_type }}</span>
+      <span class="rel-pair">
+        <a href="{% url 'dashboard:person-detail' rel.source_person.pk %}">{{ rel.source_person.canonical_name }}</a>
+        <span class="arrow">&rarr;</span>
+        <a href="{% url 'dashboard:person-detail' rel.target_person.pk %}">{{ rel.target_person.canonical_name }}</a>
+      </span>
+      {% if rel.confidence %}<span class="confidence" title="extractor confidence">conf {{ rel.confidence }}</span>{% endif %}
+    </div>
+    {% if rel.evidence_sentence %}
+    <blockquote>{{ rel.evidence_sentence }}</blockquote>
+    {% endif %}
+    <p class="hint">
+      Source:
+      <a href="{{ rel.article.url }}" target="_blank" rel="noopener">{{ rel.article.title|truncatechars:90 }} &#8599;</a>
+    </p>
+  </article>
+  {% endfor %}
+
+  {% include "dashboard/_pagination.html" %}
+{% else %}
+<div class="empty-state">
+  {% if query %}
+  <p>No relationships match &ldquo;{{ query }}&rdquo;.</p>
+  <a class="btn secondary" href="{% url 'dashboard:relationships-list' %}">Clear search</a>
+  {% else %}
+  <p>No relationships yet.</p>
+  <a class="btn" href="{% url 'dashboard:home' %}">Run a rescan on the dashboard</a>
+  {% endif %}
+</div>
+{% endif %}
+
+{% endblock %}

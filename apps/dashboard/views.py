@@ -123,6 +123,40 @@ def people_list(request: HttpRequest) -> HttpResponse:
 
 
 @require_http_methods(["GET"])
+def relationships_list(request: HttpRequest) -> HttpResponse:
+    page_size = _safe_int(request.GET.get("page_size"), 25, lo=5, hi=200)
+    query = (request.GET.get("q") or "").strip()
+
+    queryset = (
+        Relationship.objects.select_related("source_person", "target_person", "article")
+        .order_by("-created_at")
+    )
+    if query:
+        queryset = queryset.filter(
+            Q(relationship_type__icontains=query)
+            | Q(source_person__canonical_name__icontains=query)
+            | Q(target_person__canonical_name__icontains=query)
+        )
+
+    paginator = Paginator(queryset, page_size)
+    page_obj = paginator.get_page(request.GET.get("page"))
+
+    return render(
+        request,
+        "dashboard/relationships_list.html",
+        {
+            "nav": "relationships",
+            "stats": _graph_stats(),
+            "llm_provider": _llm_provider(),
+            "page_obj": page_obj,
+            "paginator": paginator,
+            "query": query,
+            "page_size": page_size,
+        },
+    )
+
+
+@require_http_methods(["GET"])
 def articles_list(request: HttpRequest) -> HttpResponse:
     page_size = _safe_int(request.GET.get("page_size"), 25, lo=5, hi=200)
     query = (request.GET.get("q") or "").strip()

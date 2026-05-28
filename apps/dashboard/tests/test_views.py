@@ -57,6 +57,37 @@ def test_articles_list_empty(client):
 
 
 @pytest.mark.django_db
+def test_relationships_list(client):
+    from apps.articles.models import Article
+    from apps.relationships.models import Relationship
+
+    article = Article.objects.create(
+        url="https://techcrunch.com/2025/01/15/x/", title="Sample", source="techcrunch"
+    )
+    a = Person.objects.create(canonical_name="Sam Altman", normalized_name="sam altman")
+    b = Person.objects.create(canonical_name="Elon Musk", normalized_name="elon musk")
+    Relationship.objects.create(
+        source_person=a,
+        target_person=b,
+        relationship_type="criticizes",
+        explanation="x",
+        evidence_sentence="Altman criticized Musk.",
+        article=article,
+    )
+    response = client.get(reverse("dashboard:relationships-list"))
+    assert response.status_code == 200
+    assert b"criticizes" in response.content
+    assert b"Altman criticized Musk." in response.content
+
+
+@pytest.mark.django_db
+def test_relationships_list_empty(client):
+    response = client.get(reverse("dashboard:relationships-list"))
+    assert response.status_code == 200
+    assert b"No relationships yet" in response.content
+
+
+@pytest.mark.django_db
 def test_person_detail(client):
     person = Person.objects.create(
         canonical_name="Sam Altman",

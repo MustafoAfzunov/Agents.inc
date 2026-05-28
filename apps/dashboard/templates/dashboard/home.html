@@ -5,18 +5,18 @@
 {% block content %}
 
 <div class="stats-bar">
-  <div class="stat-card">
+  <a class="stat-card" href="{% url 'dashboard:articles-list' %}">
     <div class="label">Articles</div>
     <div class="value">{{ stats.article_count }}</div>
-  </div>
-  <div class="stat-card">
+  </a>
+  <a class="stat-card" href="{% url 'dashboard:people-list' %}">
     <div class="label">People</div>
     <div class="value">{{ stats.person_count }}</div>
-  </div>
-  <div class="stat-card">
+  </a>
+  <a class="stat-card" href="{% url 'dashboard:relationships-list' %}">
     <div class="label">Relationships</div>
     <div class="value">{{ stats.relationship_count }}</div>
-  </div>
+  </a>
   <div class="stat-card">
     <div class="label">LLM provider</div>
     <div class="value" style="font-size:1.1rem">{{ llm_provider }}</div>
@@ -86,6 +86,7 @@
 
 <p>
   <a href="{% url 'dashboard:people-list' %}" class="btn">Browse all people &rarr;</a>
+  <a href="{% url 'dashboard:relationships-list' %}" class="btn secondary">Browse relationships &rarr;</a>
   <a href="{% url 'dashboard:articles-list' %}" class="btn secondary">Browse articles &rarr;</a>
 </p>
 

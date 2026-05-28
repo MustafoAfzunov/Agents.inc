@@ -25,6 +25,14 @@ def build_llm_provider() -> BaseLLMProvider:
         except Exception as exc:
             logger.warning("Falling back to MockLLMProvider: %s", exc)
             return MockLLMProvider()
+    if name == "spacy":
+        try:
+            from apps.ingestion.providers.spacy_provider import SpacyNERProvider
+
+            return SpacyNERProvider()
+        except Exception as exc:
+            logger.warning("spaCy provider unavailable, falling back to MockLLMProvider: %s", exc)
+            return MockLLMProvider()
     if name == "mock":
         return MockLLMProvider()
 

@@ -14,6 +14,7 @@ from typing import Iterable
 
 from apps.common.utils.text import is_probable_person_name
 from apps.ingestion.providers.base import BaseLLMProvider
+from apps.ingestion.providers.prompt_utils import split_prompt
 
 # A small set of relationship cues. The exact verb in the sentence becomes
 # the ``relationship_type`` of the resulting edge, which keeps the output
@@ -61,47 +62,6 @@ def _extract_names(text: str) -> list[str]:
     return candidates
 
 
-def _split_prompt(user_prompt: str) -> tuple[str, str, str]:
-    """Split the rendered prompt into ``(title, author, content)``.
-
-    The extractor builds the prompt from a fixed template:
-
-        Article URL: ...
-        TITLE: <title>
-        AUTHOR: <author>
-
-        CONTENT:
-        <content>
-
-        Return JSON with exactly this shape:
-        { ... }
-
-    We pull out each region separately so (a) the JSON-shape example never
-    leaks into extraction, and (b) the header labels / author line cannot be
-    mistaken for article sentences (which previously produced polluted
-    evidence sentences and spurious author edges).
-    """
-
-    text = user_prompt
-    marker = "Return JSON with exactly this shape:"
-    if marker in text:
-        text = text.split(marker, 1)[0]
-
-    title = ""
-    author = ""
-    title_match = re.search(r"^TITLE:\s*(.+)$", text, flags=re.MULTILINE)
-    if title_match:
-        title = title_match.group(1).strip()
-    author_match = re.search(r"^AUTHOR:\s*(.+)$", text, flags=re.MULTILINE)
-    if author_match:
-        author = author_match.group(1).strip()
-
-    content = ""
-    content_match = re.search(r"CONTENT:\s*(.*)$", text, flags=re.DOTALL)
-    if content_match:
-        content = content_match.group(1).strip()
-
-    return title, author, content
 
 
 def _find_relationships(sentences: Iterable[str]) -> list[dict]:
@@ -132,7 +92,7 @@ class MockLLMProvider(BaseLLMProvider):
     name = "mock"
 
     def complete_json(self, *, system_prompt: str, user_prompt: str) -> str:
-        title, author, content = _split_prompt(user_prompt)
+        title, author, content = split_prompt(user_prompt)
 
         # Relationships and evidence sentences come from the article body and
         # title only — never the header labels — so quotes stay clean.

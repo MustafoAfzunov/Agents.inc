@@ -127,9 +127,12 @@ NEWS_GRAPH = {
         "HTTP_USER_AGENT",
         "news-graph-bot/1.0 (+https://example.com/bot)",
     ),
-    # Which LLM provider to use. ``mock`` is deterministic + offline and is the
-    # default so tests and local runs never need an API key. Set ``LLM_PROVIDER=openai``
-    # together with ``OPENAI_API_KEY`` for real extraction.
+    # Which extraction provider to use:
+    #   "mock"   – deterministic regex, offline, no deps (test default).
+    #   "spacy"  – offline statistical NER (needs spaCy + en_core_web_sm model);
+    #              much cleaner PERSON detection without an API key.
+    #   "openai" – real LLM extraction (needs OPENAI_API_KEY).
+    # Unknown / unavailable providers fall back to "mock".
     "LLM_PROVIDER": env("LLM_PROVIDER", "mock"),
     "OPENAI_API_KEY": env("OPENAI_API_KEY", ""),
     "OPENAI_MODEL": env("OPENAI_MODEL", "gpt-4o-mini"),

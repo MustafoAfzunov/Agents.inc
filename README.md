@@ -188,10 +188,17 @@ class BaseLLMProvider(ABC):
 
 - `OpenAIProvider` (chat completions, `response_format=json_object`,
   `temperature=0`).
+- `SpacyNERProvider` — offline statistical `PERSON` NER (`en_core_web_sm`).
+  Filters out places/products/orgs a regex can't, with no API key.
 - `MockLLMProvider` — offline, deterministic, regex-based. Default in
   dev/test. **No API key required** to run the whole pipeline end-to-end.
 
-Switch with `LLM_PROVIDER=openai` plus `OPENAI_API_KEY=...`.
+Switch with `LLM_PROVIDER=spacy` (offline) or `LLM_PROVIDER=openai` plus
+`OPENAI_API_KEY=...`. Unknown/unavailable providers fall back to `mock`.
+
+A shared `is_probable_person_name()` validator runs on **every** provider's
+output as a final safety net (rejects single tokens, dates, sentence-leading
+stopwords, org/product tokens, and the prompt placeholder).
 
 ---
 
@@ -386,6 +393,23 @@ Or use the CLI:
 ```bash
 python manage.py rescan --pages 2
 ```
+
+### With offline spaCy NER (cleaner people, no API key)
+
+The default `mock` provider is a regex and over-captures non-people
+(places, products, orgs). The `spacy` provider uses real `PERSON` NER and
+cuts that noise dramatically (on a 2-page rescan, distinct people dropped
+from ~430 to ~145) without any API key:
+
+```bash
+pip install "spacy>=3.7,<3.8"
+python -m spacy download en_core_web_sm
+echo 'LLM_PROVIDER=spacy' >> .env
+python manage.py rescan --pages 2
+```
+
+If spaCy or the model isn't installed, the provider factory automatically
+falls back to `mock`.
 
 ### With real OpenAI extraction
 

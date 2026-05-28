@@ -2,14 +2,28 @@
 
 A small production-style ingestion platform that turns a TechCrunch topic
 feed into a queryable graph of *people* and *the relationships between
-them*. Articles are crawled, parsed, fed through an LLM extractor with a
-pluggable provider, resolved into canonical entities, and served over a
-REST API.
+them*. Articles are crawled, parsed, fed through a pluggable extraction
+provider (regex **mock**, offline **spaCy NER**, or **OpenAI**), resolved
+into canonical entities, and served over a REST API **plus** a small
+server-rendered web UI.
 
 The codebase is structured the way I would lay out a real ingestion
 service rather than a one-file script: each pipeline stage is a separate,
 substitutable module, persistence sits behind repositories, and HTTP views
 are thin wrappers around application services.
+
+**Highlights**
+
+- Pluggable extraction: `mock` (offline regex), `spacy` (offline NER, no
+  API key), `openai` (real LLM) — selected by one env var, with automatic
+  fallback.
+- Idempotent rescans enforced by DB constraints, not ad-hoc checks.
+- Canonical entity resolution with alias tracking.
+- Every relationship carries an explanation + exact evidence sentence +
+  source article (provenance).
+- REST API (paginated) and a Django-template dashboard at `/ui/`
+  (browse people, relationships, articles; run rescans/ingest).
+- 51 tests, fully offline and deterministic.
 
 ---
 
@@ -53,10 +67,12 @@ HTTP client ───► │  REST API  (apps/.../api/views.py — thin)        
   *no* parsing logic, *no* LLM logic — those are injected. That keeps it
   trivial to unit-test (every test in `apps/ingestion/tests/test_pipeline.py`
   swaps in stubs without touching any private state).
-- **Provider abstraction.** `BaseLLMProvider` has two concrete impls
-  (`OpenAIProvider`, `MockLLMProvider`). Tests default to the mock so the
-  whole suite is offline and deterministic. Production flips a single
-  setting (`LLM_PROVIDER=openai`) to use the real model.
+- **Provider abstraction.** `BaseLLMProvider` has three concrete impls
+  (`MockLLMProvider`, `SpacyNERProvider`, `OpenAIProvider`) chosen by the
+  `LLM_PROVIDER` env var. Tests default to the mock so the whole suite is
+  offline and deterministic; `spacy` gives much cleaner people offline;
+  `openai` uses the real model. Unknown/unavailable providers fall back to
+  `mock`.
 - **Crawler abstraction.** Adding The Verge or NYTimes is a new
   `ListingCrawler` subclass — nothing else in the pipeline changes.
 - **Repositories own writes.** Idempotency (the most important property
@@ -69,19 +85,20 @@ HTTP client ───► │  REST API  (apps/.../api/views.py — thin)        
 news_graph/
 ├── config/                  # Django project (settings split base/dev/test/prod)
 ├── apps/
-│   ├── common/              # shared base models, utils, exceptions, pagination
+│   ├── common/              # shared base models, utils (incl. person-name validator),
+│   │                        #   exceptions, pagination
 │   ├── articles/            # Article model + ingest/rescan services + API
 │   ├── people/              # Person model + selectors + read API
 │   ├── relationships/       # Relationship model + repository
-│   └── ingestion/           # the pipeline:
-│       ├── crawlers/        #   sources (TechCrunch today, future Verge/NYT…)
-│       ├── parsers/         #   HTML → ParsedArticle (trafilatura + bs4)
-│       ├── extractors/      #   LLM-driven people + relationships
-│       ├── providers/       #   BaseLLMProvider, OpenAIProvider, MockLLMProvider
-│       ├── resolvers/       #   canonical-Person resolver
-│       ├── pipelines/       #   orchestration (article + rescan)
-│       └── management/      #   `manage.py rescan` command
-│   └── dashboard/           #   server-rendered UI (`/ui/`)
+│   ├── ingestion/           # the pipeline:
+│   │   ├── crawlers/        #   sources (TechCrunch today, future Verge/NYT…)
+│   │   ├── parsers/         #   HTML → ParsedArticle (trafilatura + bs4)
+│   │   ├── extractors/      #   provider-driven people + relationships
+│   │   ├── providers/       #   BaseLLMProvider + Mock / Spacy / OpenAI + factory
+│   │   ├── resolvers/       #   canonical-Person resolver
+│   │   ├── pipelines/       #   orchestration (article + rescan)
+│   │   └── management/      #   `manage.py rescan` command
+│   └── dashboard/           # server-rendered web UI (`/ui/`)
 ├── docker/                  # Dockerfile + docker-compose (Postgres)
 ├── requirements/            # base.txt / dev.txt
 ├── pytest.ini
@@ -286,8 +303,10 @@ Response (201 if new, 200 if it already existed):
 - **Edges keep one evidence sentence each.** If a model proposes the same
   edge from two different sentences in the same article, we store both
   rows: that's intentional — it's two pieces of evidence, not a dupe.
-- **No frontend.** The brief explicitly de-emphasises UI work. The
-  Browsable API + the admin panel cover human exploration.
+- **Lightweight UI, not a SPA.** The brief de-emphasises UI work, so the
+  dashboard is intentionally server-rendered Django templates (no build
+  step, no JS framework) that reuse the exact same services/selectors as
+  the API. It exists for demoing and manual QA, not as a product surface.
 - **No retry queue, but HTTP retries.** `HttpClient` does exponential
   backoff for transient failures, and the rescan pipeline never lets a
   single bad article kill the whole run — it logs it into
@@ -345,6 +364,10 @@ if/when the system goes beyond a take-home:
   of the pipeline is already source-agnostic.
 - **Better resolver.** Hybrid: heuristic resolver as today, plus an
   embedding tie-breaker for ambiguous surnames.
+- **Stronger NER.** The `spacy` provider uses the small `en_core_web_sm`
+  model; a larger model (`en_core_web_trf`) or OpenAI would further reduce
+  the few org/fund names (e.g. "Baillie Gifford") that still slip through
+  the `PERSON` classifier.
 - **Edge merging.** When the LLM proposes very similar edges with
   different verbs (`criticizes` vs `attacks`), cluster them under a
   canonical relationship type.
@@ -372,13 +395,15 @@ python manage.py runserver
 
 Open **http://127.0.0.1:8000/** (redirects to `/ui/`) for a small server-rendered dashboard:
 
-| Page | URL |
-|------|-----|
-| Dashboard (rescan + ingest forms, stats) | http://127.0.0.1:8000/ui/ |
-| People list (paginated) | http://127.0.0.1:8000/ui/people/ |
-| Person detail (relationships + provenance) | http://127.0.0.1:8000/ui/people/{id}/ |
+| Page | URL | What it shows |
+|------|-----|----------------|
+| Dashboard | http://127.0.0.1:8000/ui/ | Live stats + rescan / ingest forms (with a loading overlay and elapsed time), provider badge |
+| People (paginated, searchable) | http://127.0.0.1:8000/ui/people/ | Canonical people with alias + edge counts |
+| Person detail | http://127.0.0.1:8000/ui/people/{id}/ | Outgoing/incoming relationships, each with evidence quote + source article |
+| Relationships (paginated, searchable) | http://127.0.0.1:8000/ui/relationships/ | Every edge as `source → target`, type, evidence, article |
+| Articles (paginated, searchable) | http://127.0.0.1:8000/ui/articles/ | Ingested articles with author, date, source, edge count, link |
 
-The UI calls the same `RescanService` / `ArticleIngestService` / selectors as the REST API — no duplicated business logic. Rescan and ingest show elapsed time after each form submit.
+The UI calls the same `RescanService` / `ArticleIngestService` / selectors as the REST API — no duplicated business logic. People, Relationships and Articles lists support `?q=` search and `?page_size=`. The header shows the active LLM provider so you always know which extractor produced the data.
 
 Then in another shell:
 
@@ -399,17 +424,18 @@ python manage.py rescan --pages 2
 The default `mock` provider is a regex and over-captures non-people
 (places, products, orgs). The `spacy` provider uses real `PERSON` NER and
 cuts that noise dramatically (on a 2-page rescan, distinct people dropped
-from ~430 to ~145) without any API key:
+from ~430 to ~145) without any API key. `spaCy` itself is already in
+`requirements/base.txt`; you only need to download the model:
 
 ```bash
-pip install "spacy>=3.7,<3.8"
 python -m spacy download en_core_web_sm
 echo 'LLM_PROVIDER=spacy' >> .env
 python manage.py rescan --pages 2
 ```
 
 If spaCy or the model isn't installed, the provider factory automatically
-falls back to `mock`.
+falls back to `mock`. **Note:** changing `.env` requires restarting
+`runserver` for the new provider to take effect.
 
 ### With real OpenAI extraction
 
@@ -432,6 +458,9 @@ docker compose -f docker/docker-compose.yml up --build
 pytest -q
 ```
 
-24 tests cover the crawler, parser, resolver, pipeline idempotency, and
-both API surfaces. The whole suite runs in under a second and never hits
-the network.
+**51 tests** cover the crawler, parser, person-name validator, the resolver
+(including the ambiguous-surname case that must *not* merge), pipeline
+idempotency, the REST API, and the dashboard views. The suite is fully
+offline and deterministic (forces the `mock` provider) and runs in ~1s.
+The two spaCy provider tests auto-skip if the `en_core_web_sm` model isn't
+installed.

@@ -1,0 +1,33 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}News Knowledge Graph{% endblock %}</title>
+  <link rel="stylesheet" href="{% static 'dashboard/css/site.css' %}">
+</head>
+<body>
+  <div class="layout">
+    <header class="site-header">
+      <h1>News → People Knowledge Graph</h1>
+      <p class="tagline">TechCrunch OpenAI topic · browse the graph or run ingestion below</p>
+      <nav class="main-nav">
+        <a href="{% url 'dashboard:home' %}" {% if nav == 'home' %}class="active"{% endif %}>Dashboard</a>
+        <a href="{% url 'dashboard:people-list' %}" {% if nav == 'people' %}class="active"{% endif %}>People</a>
+        <a href="/people/" target="_blank" rel="noopener">API (JSON)</a>
+        <a href="/admin/" target="_blank" rel="noopener">Admin</a>
+      </nav>
+    </header>
+
+    {% block content %}{% endblock %}
+
+    <footer class="site-footer">
+      REST API: <a href="/articles/">POST /articles/</a> ·
+      <a href="/rescan/">POST /rescan/</a> ·
+      <a href="/people/">GET /people/</a> ·
+      <a href="/health/">/health/</a>
+    </footer>
+  </div>
+</body>
+</html>

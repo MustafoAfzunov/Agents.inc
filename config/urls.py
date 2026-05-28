@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from django.contrib import admin
 from django.http import JsonResponse
+from django.shortcuts import redirect
 from django.urls import include, path
 
 
@@ -15,8 +16,10 @@ def healthcheck(_request):
 
 
 urlpatterns = [
+    path("", lambda _request: redirect("dashboard:home", permanent=False)),
     path("admin/", admin.site.urls),
     path("health/", healthcheck, name="health"),
+    path("ui/", include("apps.dashboard.urls")),
     path("", include("apps.articles.api.urls")),
     path("", include("apps.people.api.urls")),
 ]

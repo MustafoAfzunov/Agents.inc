@@ -81,6 +81,7 @@ news_graph/
 │       ├── resolvers/       #   canonical-Person resolver
 │       ├── pipelines/       #   orchestration (article + rescan)
 │       └── management/      #   `manage.py rescan` command
+│   └── dashboard/           #   server-rendered UI (`/ui/`)
 ├── docker/                  # Dockerfile + docker-compose (Postgres)
 ├── requirements/            # base.txt / dev.txt
 ├── pytest.ini
@@ -359,6 +360,18 @@ cp .env.example .env
 python manage.py migrate
 python manage.py runserver
 ```
+
+### Web UI (Django templates)
+
+Open **http://127.0.0.1:8000/** (redirects to `/ui/`) for a small server-rendered dashboard:
+
+| Page | URL |
+|------|-----|
+| Dashboard (rescan + ingest forms, stats) | http://127.0.0.1:8000/ui/ |
+| People list (paginated) | http://127.0.0.1:8000/ui/people/ |
+| Person detail (relationships + provenance) | http://127.0.0.1:8000/ui/people/{id}/ |
+
+The UI calls the same `RescanService` / `ArticleIngestService` / selectors as the REST API — no duplicated business logic. Rescan and ingest show elapsed time after each form submit.
 
 Then in another shell:
 

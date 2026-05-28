@@ -55,6 +55,7 @@ INSTALLED_APPS = [
     "apps.people",
     "apps.relationships",
     "apps.ingestion",
+    "apps.dashboard",
 ]
 
 MIDDLEWARE = [

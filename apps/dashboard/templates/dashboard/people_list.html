@@ -1,0 +1,61 @@
+{% extends "dashboard/base.html" %}
+
+{% block title %}People · News Knowledge Graph{% endblock %}
+
+{% block content %}
+
+<div class="stats-bar">
+  <div class="stat-card">
+    <div class="label">People</div>
+    <div class="value">{{ stats.person_count }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Relationships</div>
+    <div class="value">{{ stats.relationship_count }}</div>
+  </div>
+</div>
+
+<h2 style="margin-top:0">Canonical people</h2>
+
+{% if page_obj.object_list %}
+<table class="data-table">
+  <thead>
+    <tr>
+      <th>ID</th>
+      <th>Name</th>
+      <th>Aliases</th>
+      <th>Outgoing</th>
+      <th>Incoming</th>
+      <th>Mentions</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for person in page_obj %}
+    <tr>
+      <td><a href="{% url 'dashboard:person-detail' person.pk %}">{{ person.pk }}</a></td>
+      <td><a href="{% url 'dashboard:person-detail' person.pk %}"><strong>{{ person.canonical_name }}</strong></a></td>
+      <td class="hint">{% if person.aliases %}{{ person.aliases|join:", "|truncatechars:60 }}{% else %}—{% endif %}</td>
+      <td>{{ person.outgoing_count }}</td>
+      <td>{{ person.incoming_count }}</td>
+      <td>{{ person.mention_count }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<div class="pagination">
+  {% if page_obj.has_previous %}
+  <a class="btn secondary" href="?page={{ page_obj.previous_page_number }}">← Previous</a>
+  {% endif %}
+  <span class="muted">Page {{ page_obj.number }} of {{ paginator.num_pages }} ({{ paginator.count }} total)</span>
+  {% if page_obj.has_next %}
+  <a class="btn secondary" href="?page={{ page_obj.next_page_number }}">Next →</a>
+  {% endif %}
+</div>
+{% else %}
+<p class="hint">No people yet. <a href="{% url 'dashboard:home' %}">Run a rescan</a> on the dashboard.</p>
+{% endif %}
+
+<p style="margin-top:2rem"><a href="{% url 'dashboard:home' %}">← Dashboard</a></p>
+
+{% endblock %}

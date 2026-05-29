@@ -4,7 +4,9 @@ requests==2.32.3
 beautifulsoup4==4.12.3
 trafilatura==1.12.0
 python-dotenv==1.0.1
-openai==1.40.0
+# >=1.55 required for compatibility with httpx>=0.28 (older versions pass a
+# removed `proxies` kwarg and crash on client init).
+openai>=1.55,<2
 psycopg2-binary==2.9.9
 # Optional offline NER provider (LLM_PROVIDER=spacy). After installing, run:
 #   python -m spacy download en_core_web_sm

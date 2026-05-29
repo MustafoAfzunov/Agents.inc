@@ -12,9 +12,10 @@ services:
     runtime: python
     plan: free
     buildCommand: "./build.sh"
-    # Long timeout because /rescan ingests synchronously; 2 workers so one slow
-    # rescan does not block read traffic.
-    startCommand: "gunicorn config.wsgi:application --timeout 300 --workers 2"
+    # Very long timeout because /rescan ingests synchronously and the free
+    # instance is CPU-throttled (a 2-page crawl + LLM pass can take many
+    # minutes). 2 workers so a slow rescan never blocks the health check.
+    startCommand: "gunicorn config.wsgi:application --timeout 1800 --workers 2 --graceful-timeout 60"
     healthCheckPath: /health/
     envVars:
       - key: DJANGO_SETTINGS_MODULE

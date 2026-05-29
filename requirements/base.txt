@@ -8,6 +8,7 @@ python-dotenv==1.0.1
 # removed `proxies` kwarg and crash on client init).
 openai>=1.55,<2
 psycopg2-binary==2.9.9
-# Optional offline NER provider (LLM_PROVIDER=spacy). After installing, run:
-#   python -m spacy download en_core_web_sm
-spacy>=3.7,<3.8
+# Production WSGI server + static file serving + DATABASE_URL parsing.
+gunicorn==22.0.0
+whitenoise==6.7.0
+dj-database-url==2.2.0

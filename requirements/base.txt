@@ -12,3 +12,5 @@ psycopg2-binary==2.9.9
 gunicorn==22.0.0
 whitenoise==6.7.0
 dj-database-url==2.2.0
+# Offline fallback when OpenAI quota/key fails (LLM_PROVIDER=openai uses both).
+spacy>=3.7,<3.8

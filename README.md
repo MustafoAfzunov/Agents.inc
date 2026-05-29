@@ -67,12 +67,12 @@ HTTP client ───► │  REST API  (apps/.../api/views.py — thin)        
   *no* parsing logic, *no* LLM logic — those are injected. That keeps it
   trivial to unit-test (every test in `apps/ingestion/tests/test_pipeline.py`
   swaps in stubs without touching any private state).
-- **Provider abstraction.** `BaseLLMProvider` has three concrete impls
-  (`MockLLMProvider`, `SpacyNERProvider`, `OpenAIProvider`) chosen by the
-  `LLM_PROVIDER` env var. Tests default to the mock so the whole suite is
-  offline and deterministic; `spacy` gives much cleaner people offline;
-  `openai` uses the real model. Unknown/unavailable providers fall back to
-  `mock`.
+- **Provider abstraction.** `BaseLLMProvider` has concrete impls
+  (`MockLLMProvider`, `SpacyNERProvider`, `OpenAIProvider`) plus
+  `AdaptiveLLMProvider` when `LLM_PROVIDER=openai`: OpenAI first, then
+  **automatic sticky fallback to spaCy** if the key or quota fails. Tests
+  default to `mock` (offline); `spacy` is offline NER; `openai`/`auto` use
+  the adaptive path in production.
 - **Crawler abstraction.** Adding The Verge or NYTimes is a new
   `ListingCrawler` subclass — nothing else in the pipeline changes.
 - **Repositories own writes.** Idempotency (the most important property
@@ -209,9 +209,21 @@ class BaseLLMProvider(ABC):
   Filters out places/products/orgs a regex can't, with no API key.
 - `MockLLMProvider` — offline, deterministic, regex-based. Default in
   dev/test. **No API key required** to run the whole pipeline end-to-end.
+- `AdaptiveLLMProvider` — used when `LLM_PROVIDER=openai` or `auto`.
+  Calls OpenAI while the key and quota work; on billing/auth/quota errors
+  logs a warning and **sticks to spaCy for the rest of that worker process**
+  so rescans are not aborted mid-run. The dashboard header shows the active
+  backend (`openai` vs `spacy` after fallback).
 
-Switch with `LLM_PROVIDER=spacy` (offline) or `LLM_PROVIDER=openai` plus
-`OPENAI_API_KEY=...`. Unknown/unavailable providers fall back to `mock`.
+| `LLM_PROVIDER` | Behaviour |
+|----------------|-----------|
+| `mock` | Regex only (tests / quick local runs) |
+| `spacy` | spaCy NER only |
+| `openai` / `auto` | OpenAI → spaCy on quota/key failure → mock if spaCy missing |
+
+Set `OPENAI_API_KEY` for production; install spaCy model with
+`python -m spacy download en_core_web_sm` (Render `build.sh` does this
+automatically).
 
 A shared `is_probable_person_name()` validator runs on **every** provider's
 output as a final safety net (rejects single tokens, dates, sentence-leading
@@ -437,13 +449,21 @@ If spaCy or the model isn't installed, the provider factory automatically
 falls back to `mock`. **Note:** changing `.env` requires restarting
 `runserver` for the new provider to take effect.
 
-### With real OpenAI extraction
+### With OpenAI extraction (recommended) + automatic spaCy fallback
+
+Production default: use OpenAI for typed relationships; when the key is
+invalid or quota is spent, ingestion **switches to spaCy** for that worker
+without changing `.env`.
 
 ```bash
-echo 'LLM_PROVIDER=openai'  >> .env
+echo 'LLM_PROVIDER=openai'  >> .env   # or LLM_PROVIDER=auto
 echo 'OPENAI_API_KEY=sk-...' >> .env
+python -m spacy download en_core_web_sm   # required for fallback
 python manage.py rescan --pages 2
 ```
+
+After fallback, the UI badge shows `LLM: spacy` instead of `openai`. Restart
+the server (or redeploy) to try OpenAI again after topping up billing.
 
 ### With Postgres (Docker)
 
@@ -458,7 +478,8 @@ docker compose -f docker/docker-compose.yml up --build
 pytest -q
 ```
 
-**51 tests** cover the crawler, parser, person-name validator, the resolver
+**57 tests** cover the crawler, parser, person-name validator, the resolver,
+OpenAI→spaCy adaptive fallback,
 (including the ambiguous-surname case that must *not* merge), pipeline
 idempotency, the REST API, and the dashboard views. The suite is fully
 offline and deterministic (forces the `mock` provider) and runs in ~1s.

@@ -2,7 +2,3 @@
 pytest==8.3.2
 pytest-django==4.8.0
 responses==0.25.3
-# Optional offline NER provider (LLM_PROVIDER=spacy). After installing, run:
-#   python -m spacy download en_core_web_sm
-# Kept out of base/prod so deploys stay lean (production uses LLM_PROVIDER=openai).
-spacy>=3.7,<3.8

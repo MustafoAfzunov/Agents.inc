@@ -33,6 +33,13 @@ def _graph_stats() -> dict[str, int]:
 
 
 def _llm_provider() -> str:
+    """Configured provider, or the runtime backend after an OpenAI→spaCy fallback."""
+
+    from apps.ingestion.providers.fallback_provider import get_active_backend
+
+    active = get_active_backend()
+    if active:
+        return active
     return getattr(settings, "NEWS_GRAPH", {}).get("LLM_PROVIDER", "mock")
 
 

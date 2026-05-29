@@ -130,10 +130,11 @@ NEWS_GRAPH = {
     ),
     # Which extraction provider to use:
     #   "mock"   – deterministic regex, offline, no deps (test default).
-    #   "spacy"  – offline statistical NER (needs spaCy + en_core_web_sm model);
-    #              much cleaner PERSON detection without an API key.
-    #   "openai" – real LLM extraction (needs OPENAI_API_KEY).
-    # Unknown / unavailable providers fall back to "mock".
+    #   "spacy"  – offline statistical NER (needs spaCy + en_core_web_sm model).
+    #   "openai" – OpenAI when the key works; auto-falls back to spaCy on
+    #              quota/auth/billing errors (recommended for production).
+    #   "auto"   – alias for "openai".
+    # Unknown providers fall back to "mock".
     "LLM_PROVIDER": env("LLM_PROVIDER", "mock"),
     "OPENAI_API_KEY": env("OPENAI_API_KEY", ""),
     "OPENAI_MODEL": env("OPENAI_MODEL", "gpt-4o-mini"),

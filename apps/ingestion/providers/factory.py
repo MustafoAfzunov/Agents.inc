@@ -17,14 +17,11 @@ def build_llm_provider() -> BaseLLMProvider:
     cfg = getattr(settings, "NEWS_GRAPH", {})
     name = (cfg.get("LLM_PROVIDER") or "mock").lower()
 
-    if name == "openai":
-        try:
-            from apps.ingestion.providers.openai_provider import OpenAIProvider
+    if name in {"openai", "auto"}:
+        # OpenAI when the key works; sticky fallback to spaCy on quota/auth errors.
+        from apps.ingestion.providers.fallback_provider import AdaptiveLLMProvider
 
-            return OpenAIProvider()
-        except Exception as exc:
-            logger.warning("Falling back to MockLLMProvider: %s", exc)
-            return MockLLMProvider()
+        return AdaptiveLLMProvider()
     if name == "spacy":
         try:
             from apps.ingestion.providers.spacy_provider import SpacyNERProvider
